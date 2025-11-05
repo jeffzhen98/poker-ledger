@@ -1,0 +1,87 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ChipColor {
+  WHITE
+  BLUE
+  RED
+  GREEN
+  BLACK
+}
+
+model Table {
+  id            String         @id @default(cuid())
+  name          String
+  createdAt     DateTime       @default(now())
+  endedAt       DateTime?
+  denominations Denominations?
+  players       Player[]
+  buyIns        BuyIn[]
+  endChipCounts EndChipCounts?
+  chipCounts    PlayerChipCount[]  // ADD THIS LINE
+}
+
+model Denominations {
+  id      String @id @default(cuid())
+  tableId String @unique
+  table   Table  @relation(fields: [tableId], references: [id])
+  white   Float  @default(0.25)  // CHANGED FROM Int TO Float
+  blue    Float  @default(0.5)   // CHANGED FROM Int TO Float
+  red     Float  @default(1)     // CHANGED FROM Int TO Float
+  green   Float  @default(2)     // CHANGED FROM Int TO Float
+  black   Float  @default(5)     // CHANGED FROM Int TO Float
+}
+
+model Player {
+  id         String            @id @default(cuid())
+  tableId    String
+  table      Table             @relation(fields: [tableId], references: [id])
+  name       String
+  buyIns     BuyIn[]
+  chipCounts PlayerChipCount[]
+}
+
+model PlayerChipCount {
+  id        String   @id @default(cuid())
+  player    Player   @relation(fields: [playerId], references: [id])
+  playerId  String
+  tableId   String   // ADD THIS LINE
+  table     Table    @relation(fields: [tableId], references: [id])  // ADD THIS LINE
+  white     Int      @default(0)
+  blue      Int      @default(0)
+  red       Int      @default(0)
+  green     Int      @default(0)
+  black     Int      @default(0)
+  createdAt DateTime @default(now())
+  
+  @@unique([playerId, tableId])  // ADD THIS LINE - critical for upsert!
+}
+
+model BuyIn {
+  id        String   @id @default(cuid())
+  tableId   String
+  table     Table    @relation(fields: [tableId], references: [id])
+  playerId  String
+  player    Player   @relation(fields: [playerId], references: [id])
+  amount    Int // cents to avoid float issues
+  createdAt DateTime @default(now())
+}
+
+model EndChipCounts {
+  id      String @id @default(cuid())
+  tableId String @unique
+  table   Table  @relation(fields: [tableId], references: [id])
+  white   Int    @default(0) // total count of white chips on the table
+  blue    Int    @default(0)
+  red     Int    @default(0)
+  green   Int    @default(0)
+  black   Int    @default(0)
+}
