@@ -222,8 +222,9 @@ export default function TablePage() {
                 <thead>
                   <tr className="text-left border-b border-gray-300 dark:border-neutral-600">
                     <th className="py-2 text-gray-900 dark:text-white">Name</th>
-                    <th className="py-2 text-gray-900 dark:text-white"># Buy-ins</th>
+                    <th className="py-2 text-gray-900 dark:text-white">Buy-ins</th>
                     <th className="py-2 text-gray-900 dark:text-white">Total ($)</th>
+                    <th className="py-2 text-gray-900 dark:text-white">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -232,8 +233,47 @@ export default function TablePage() {
                     return (
                       <tr key={p.id} className="border-b border-gray-200 dark:border-neutral-700">
                         <td className="py-2 text-gray-900 dark:text-white">{p.name}</td>
-                        <td className="py-2 text-gray-700 dark:text-gray-300">{p.buyIns.length}</td>
+                        <td className="py-2 text-gray-700 dark:text-gray-300">
+                          <details className="cursor-pointer">
+                            <summary>{p.buyIns.length} buy-ins</summary>
+                            <ul className="mt-2 space-y-1 ml-4">
+                              {p.buyIns.map((buyIn: any) => (
+                                <li key={buyIn.id} className="flex items-center gap-2 text-xs">
+                                  <span>${(buyIn.amount / 100).toFixed(2)}</span>
+                                  <button
+                                    onClick={async () => {
+                                      if (confirm('Delete this buy-in?')) {
+                                        await fetch(`/api/table/${id}/buyin?buyInId=${buyIn.id}`, {
+                                          method: 'DELETE',
+                                        });
+                                        mutate();
+                                      }
+                                    }}
+                                    className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                                  >
+                                    ✕
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        </td>
                         <td className="py-2 text-gray-700 dark:text-gray-300">{(cents / 100).toFixed(2)}</td>
+                        <td className="py-2">
+                          <button
+                            onClick={async () => {
+                              if (confirm(`Remove ${p.name}?`)) {
+                                await fetch(`/api/table/${id}/players?playerId=${p.id}`, {
+                                  method: 'DELETE',
+                                });
+                                mutate();
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 text-xs"
+                          >
+                            Remove
+                          </button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -241,7 +281,7 @@ export default function TablePage() {
               </table>
             </div>
 
-            {/* Rebuy */}
+            {/* Rebuy - now allows negative amounts */}
             <div className="flex flex-wrap gap-2 pt-2">
               <select
                 value={rebuyPlayer}
@@ -257,7 +297,7 @@ export default function TablePage() {
               </select>
               <input
                 className="border border-gray-300 dark:border-neutral-600 rounded px-3 py-2 bg-white dark:bg-neutral-700 text-gray-900 dark:text-white placeholder:text-gray-500"
-                placeholder="Buy-in amount ($)"
+                placeholder="Amount ($, can be negative)"
                 value={rebuyAmt}
                 onChange={(e) => setRebuyAmt(e.target.value)}
               />
