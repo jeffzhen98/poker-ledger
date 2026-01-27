@@ -1,8 +1,9 @@
 "use client";
 
 import useSWR from "swr";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useParams } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -25,6 +26,10 @@ export default function TablePage() {
   const [playerName, setPlayerName] = useState("");
   const [rebuyAmt, setRebuyAmt] = useState("");
   const [rebuyPlayer, setRebuyPlayer] = useState("");
+  const [user, setUser] = useState<any>(null);
+  const [displayName, setDisplayName] = useState("");
+  const [showEditName, setShowEditName] = useState(false);
+  const [editNameLoading, setEditNameLoading] = useState(false);
 
   // Store chip counts for each player
   const [playerChips, setPlayerChips] = useState<Record<string, { white: number; blue: number; red: number; green: number; black: number }>>({});
@@ -44,6 +49,72 @@ export default function TablePage() {
         black: data.denominations.black,
       }
     : null;
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      
+      // Fetch user profile with display name from database
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const res = await fetch("/api/user", {
+          headers: {
+            ...(token && { "Authorization": `Bearer ${token}` })
+          }
+        });
+        const userData = await res.json();
+        setDisplayName(userData.displayName || user?.email?.split("@")[0] || "");
+      } catch (error) {
+        console.error("Error fetching user profile:", error);
+        setDisplayName(user?.email?.split("@")[0] || "");
+      }
+    };
+    getUser();
+  }, []);
+
+  const handleEditName = async () => {
+    if (!displayName.trim()) return;
+    setEditNameLoading(true);
+    try {
+      // Get the session token to send with the request
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+
+      // Save display name to database
+      const res = await fetch("/api/user", {
+        method: "PUT",
+        headers: { 
+          "Content-Type": "application/json",
+          ...(token && { "Authorization": `Bearer ${token}` })
+        },
+        body: JSON.stringify({ displayName }),
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.details || errorData.error || "Failed to save display name");
+      }
+      // Refetch user profile to confirm save
+      const confirmRes = await fetch("/api/user", {
+        headers: { 
+          ...(token && { "Authorization": `Bearer ${token}` })
+        }
+      });
+      const userData = await confirmRes.json();
+      setDisplayName(userData.displayName || user?.email?.split("@")[0] || "");
+    } catch (error) {
+      console.error("Error saving display name:", error);
+      alert(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setEditNameLoading(false);
+      setShowEditName(false);
+    }
+  };
+
+  const goHome = () => {
+    window.location.href = "/";
+  };
 
   // Initialize player chips from data
   useMemo(() => {
@@ -165,31 +236,58 @@ export default function TablePage() {
   if (!id) return <main className="p-6 text-gray-900 dark:text-white">Loading…</main>;
 
   return (
-    <main className="space-y-6">
+    <main className="min-h-screen w-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Header */}
+      <div className="bg-black border-b border-slate-700">
+        <div className="px-6 py-4 flex justify-between items-center">
+          <button
+            onClick={goHome}
+            className="text-2xl font-bold text-white hover:text-slate-300 transition"
+          >
+            Poker Ledger
+          </button>
+          
+          {user && (
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowEditName(!showEditName)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition"
+              >
+                <span className="text-lg">👤</span>
+                <span className="text-sm font-medium truncate max-w-[150px]">{displayName || user.email}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="p-6">
+        <div>
       {!data ? (
-        <div className="text-gray-900 dark:text-white">Loading…</div>
+        <div className="text-slate-400">Loading…</div>
       ) : (
         <>
           {/* Denominations */}
-          <section className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-6 space-y-4">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Table · {data.name}</h2>
+          <section className="bg-slate-800 rounded-2xl shadow-2xl p-6 space-y-4 border border-slate-700">
+            <h2 className="text-xl font-semibold text-white">Table · {data.name}</h2>
 
             <form onSubmit={onSubmitDenoms} className="grid grid-cols-2 md:grid-cols-5 gap-3">
               {(["white", "blue", "red", "green", "black"] as const).map((c) => (
                 <div key={c} className="space-y-1">
-                  <label className="text-sm capitalize text-gray-700 dark:text-gray-300">{c} ($/chip)</label>
+                  <label className="text-sm capitalize text-slate-300">{c} ($/chip)</label>
                   <input
                     name={c}
                     type="number"
                     min={0.01}
                     step={0.01}
                     defaultValue={data.denominations?.[c] ?? (c === "white" ? 0.25 : c === "blue" ? 0.5 : c === "red" ? 1 : c === "green" ? 2 : 5)}
-                    className="border border-gray-300 dark:border-neutral-600 rounded px-3 py-2 w-full bg-white dark:bg-neutral-700 text-gray-900 dark:text-white"
+                    className="border border-slate-600 rounded px-3 py-2 w-full bg-slate-700 text-white"
                   />
                 </div>
               ))}
               <div className="col-span-full">
-                <button className="px-4 py-2 rounded-2xl bg-black dark:bg-white text-white dark:text-black hover:bg-gray-800 dark:hover:bg-gray-200 transition">
+                <button className="px-4 py-2 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition">
                   Save Denominations
                 </button>
               </div>
@@ -197,22 +295,22 @@ export default function TablePage() {
           </section>
 
           {/* Players */}
-          <section className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-6 space-y-4">
+          <section className="bg-slate-800 rounded-2xl shadow-2xl p-6 space-y-4 border border-slate-700 mt-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Players</h3>
-              <div className="text-sm text-gray-700 dark:text-gray-300">
-                Total Buy-ins: <strong className="text-gray-900 dark:text-white">${totalBuyInsDollars}</strong>
+              <h3 className="text-lg font-semibold text-white">Players</h3>
+              <div className="text-sm text-slate-300">
+                Total Buy-ins: <strong className="text-white">${totalBuyInsDollars}</strong>
               </div>
             </div>
 
             <div className="flex gap-2">
               <input
-                className="border border-gray-300 dark:border-neutral-600 rounded px-3 py-2 bg-white dark:bg-neutral-700 text-gray-900 dark:text-white placeholder:text-gray-500"
+                className="border border-slate-600 rounded px-3 py-2 bg-slate-700 text-white placeholder:text-slate-400"
                 placeholder="Player name"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
               />
-              <button onClick={addPlayer} className="px-4 py-2 rounded-2xl bg-neutral-900 dark:bg-neutral-100 text-white dark:text-black hover:bg-neutral-800 dark:hover:bg-neutral-200 transition">
+              <button onClick={addPlayer} className="px-4 py-2 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition">
                 Add
               </button>
             </div>
@@ -220,20 +318,20 @@ export default function TablePage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-left border-b border-gray-300 dark:border-neutral-600">
-                    <th className="py-2 text-gray-900 dark:text-white">Name</th>
-                    <th className="py-2 text-gray-900 dark:text-white">Buy-ins</th>
-                    <th className="py-2 text-gray-900 dark:text-white">Total ($)</th>
-                    <th className="py-2 text-gray-900 dark:text-white">Actions</th>
+                  <tr className="text-left border-b border-slate-600">
+                    <th className="py-2 text-white">Name</th>
+                    <th className="py-2 text-white">Buy-ins</th>
+                    <th className="py-2 text-white">Total ($)</th>
+                    <th className="py-2 text-white">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.players.map((p: any) => {
                     const cents = p.buyIns.reduce((s: number, b: any) => s + b.amount, 0);
                     return (
-                      <tr key={p.id} className="border-b border-gray-200 dark:border-neutral-700">
-                        <td className="py-2 text-gray-900 dark:text-white">{p.name}</td>
-                        <td className="py-2 text-gray-700 dark:text-gray-300">
+                      <tr key={p.id} className="border-b border-slate-700">
+                        <td className="py-2 text-white">{p.name}</td>
+                        <td className="py-2 text-slate-300">
                           <details className="cursor-pointer">
                             <summary>{p.buyIns.length} buy-ins</summary>
                             <ul className="mt-2 space-y-1 ml-4">
@@ -356,31 +454,64 @@ export default function TablePage() {
             </div>
 
             {denoms && (
-              <p className="text-sm text-gray-700 dark:text-gray-400">
+              <p className="text-sm text-slate-400">
                 Current denominations — W:${denoms.white} B:${denoms.blue} R:${denoms.red} G:${denoms.green} Blk:${denoms.black}
               </p>
             )}
           </section>
 
           {/* Reconcile */}
-          <section className="bg-white dark:bg-neutral-800 rounded-2xl shadow p-6">
+          <section className="bg-slate-800 rounded-2xl shadow-2xl p-6 border border-slate-700 mt-6">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Reconcile</h3>
-                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                <h3 className="text-lg font-semibold text-white">Reconcile</h3>
+                <p className="text-sm text-slate-400 mt-1">
                   Compare total buy-ins vs. total chip values
                 </p>
               </div>
               <button 
                 type="button" 
                 onClick={reconcile} 
-                className="px-6 py-3 rounded-2xl bg-indigo-600 dark:bg-indigo-500 text-white hover:bg-indigo-700 dark:hover:bg-indigo-600 transition font-semibold"
+                className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white transition font-semibold"
               >
                 Reconcile Now
               </button>
             </div>
           </section>
         </>
+      )}
+        </div>
+      </div>
+
+      {/* Edit Name Modal */}
+      {showEditName && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-8 max-w-md w-full">
+            <h3 className="text-xl font-semibold text-white mb-4">Edit Display Name</h3>
+            <input
+              type="text"
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              className="w-full px-4 py-3 rounded-lg bg-slate-700 border border-slate-600 text-white placeholder:text-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition mb-4"
+              placeholder="Enter display name"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={handleEditName}
+                disabled={editNameLoading}
+                className="flex-1 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium disabled:opacity-50 transition"
+              >
+                {editNameLoading ? "Saving..." : "Save"}
+              </button>
+              <button
+                onClick={() => setShowEditName(false)}
+                className="flex-1 px-4 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white font-medium transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );

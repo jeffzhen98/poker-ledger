@@ -17,6 +17,14 @@ enum ChipColor {
   BLACK
 }
 
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  displayName String    @default("")
+  createdAt   DateTime  @default(now())
+  players     Player[]
+}
+
 model Table {
   id            String         @id @default(cuid())
   name          String
@@ -44,6 +52,8 @@ model Player {
   id         String            @id @default(cuid())
   tableId    String
   table      Table             @relation(fields: [tableId], references: [id])
+  userId     String?
+  user       User?             @relation(fields: [userId], references: [id])
   name       String
   buyIns     BuyIn[]
   chipCounts PlayerChipCount[]
