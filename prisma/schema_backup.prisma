@@ -99,29 +99,3 @@ model EndChipCounts {
   green   Int    @default(0)
   black   Int    @default(0)
 }
-
-model GameHistory {
-  id            String               @id @default(cuid())
-  tableName     String
-  joinCode      String
-  hostId        String
-  createdAt     DateTime
-  endedAt       DateTime
-  playerResults PlayerGameResult[]
-}
-
-model PlayerGameResult {
-  id             String      @id @default(cuid())
-  gameHistoryId  String
-  gameHistory    GameHistory @relation(fields: [gameHistoryId], references: [id], onDelete: Cascade)
-  userId         String?
-  playerName     String
-  buyInTotal     Int
-  chipCountWhite Int         @default(0)
-  chipCountBlue  Int         @default(0)
-  chipCountRed   Int         @default(0)
-  chipCountGreen Int         @default(0)
-  chipCountBlack Int         @default(0)
-  cashOutAmount  Int
-  profitLoss     Int
-}

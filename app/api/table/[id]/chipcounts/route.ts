@@ -16,15 +16,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     const { playerId, white, blue, red, green, black } = Body.parse(await req.json());
     
+    // Check if id is a join code or database ID
+    const isJoinCode = /^[A-Z]{4}$/.test(id);
+    
+    // Get the actual table ID if using join code
+    let tableId = id;
+    if (isJoinCode) {
+      const table = await prisma.table.findUnique({
+        where: { joinCode: id },
+        select: { id: true }
+      });
+      if (!table) {
+        return NextResponse.json({ error: "Table not found" }, { status: 404 });
+      }
+      tableId = table.id;
+    }
+    
     const chipCount = await prisma.playerChipCount.upsert({
       where: { 
         playerId_tableId: { 
           playerId, 
-          tableId: id 
+          tableId 
         } 
       },
       update: { white, blue, red, green, black },
-      create: { playerId, tableId: id, white, blue, red, green, black },
+      create: { playerId, tableId, white, blue, red, green, black },
     });
     
     return NextResponse.json(chipCount);

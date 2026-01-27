@@ -2,13 +2,39 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../../../../lib/db";
 import { z } from "zod";
 
-const Body = z.object({ name: z.string().min(1) });
+const Body = z.object({ 
+  name: z.string().min(1),
+  userId: z.string().optional()
+});
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params;
-    const { name } = Body.parse(await req.json());
-    const player = await prisma.player.create({ data: { name, tableId: id } });
+    const body = Body.parse(await req.json());
+    
+    // Check if id is a join code or database ID
+    const isJoinCode = /^[A-Z]{4}$/.test(id);
+    
+    // Get the actual table ID if using join code
+    let tableId = id;
+    if (isJoinCode) {
+      const table = await prisma.table.findUnique({
+        where: { joinCode: id },
+        select: { id: true }
+      });
+      if (!table) {
+        return NextResponse.json({ error: "Table not found" }, { status: 404 });
+      }
+      tableId = table.id;
+    }
+    
+    const player = await prisma.player.create({ 
+      data: { 
+        name: body.name, 
+        tableId,
+        userId: body.userId || null
+      } 
+    });
     return NextResponse.json(player);
   } catch (error) {
     console.error("Add player error:", error);

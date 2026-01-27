@@ -8,8 +8,11 @@ export async function GET(
   const { id } = await params;
 
   try {
+    // Check if id is a join code or database ID
+    const isJoinCode = /^[A-Z]{4}$/.test(id);
+    
     const table = await prisma.table.findUnique({
-      where: { id },
+      where: isJoinCode ? { joinCode: id } : { id },
       include: {
         denominations: true,
         players: {

@@ -10,6 +10,7 @@ export default function Home() {
   const [displayName, setDisplayName] = useState("");
   const [showEditName, setShowEditName] = useState(false);
   const [editNameLoading, setEditNameLoading] = useState(false);
+  const [gameHistory, setGameHistory] = useState<any[]>([]);
 
   useEffect(() => {
     // Create a deep history stack to prevent going back
@@ -48,6 +49,23 @@ export default function Home() {
         console.error("Error fetching user profile:", error);
         setDisplayName(user.email?.split("@")[0] || "");
       }
+      
+      // Fetch game history
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const historyRes = await fetch("/api/user/history", {
+          headers: {
+            ...(token && { "Authorization": `Bearer ${token}` })
+          }
+        });
+        if (historyRes.ok) {
+          const history = await historyRes.json();
+          setGameHistory(history);
+        }
+      } catch (error) {
+        console.error("Error fetching game history:", error);
+      }
     };
 
     getUser();
@@ -69,10 +87,34 @@ export default function Home() {
 
   const create = async () => {
     setLoading(true);
-    const res = await fetch("/api/table", { method: "POST", body: JSON.stringify({ name }) });
-    const json = await res.json();
-    setLoading(false);
-    if (json.id) window.location.href = `/table/${json.id}`;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      
+      const res = await fetch("/api/table", { 
+        method: "POST", 
+        headers: {
+          "Content-Type": "application/json",
+          ...(token && { "Authorization": `Bearer ${token}` })
+        },
+        body: JSON.stringify({ name }) 
+      });
+      
+      if (!res.ok) {
+        const error = await res.json();
+        console.error("Error creating table:", error);
+        alert(error.error || "Failed to create table");
+        setLoading(false);
+        return;
+      }
+      
+      const json = await res.json();
+      setLoading(false);
+      if (json.joinCode) window.location.href = `/table/${json.joinCode}`;
+    } catch (error) {
+      console.error("Error creating table:", error);
+      setLoading(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -176,9 +218,52 @@ export default function Home() {
             </p>
           </div>
 
-          {/* Placeholder for history */}
-          <div className="bg-slate-800 rounded-xl border border-slate-700 p-8 text-center">
-            <p className="text-slate-400">Your game history will appear here</p>
+          {/* Game History */}
+          <div className="bg-slate-800 rounded-xl border border-slate-700 p-8">
+            <h2 className="text-xl font-semibold text-white mb-6">Your Game History</h2>
+            {gameHistory.length === 0 ? (
+              <p className="text-slate-400 text-center">No games played yet</p>
+            ) : (
+              <div className="space-y-4">
+                {gameHistory.map((result) => {
+                  const profit = result.profitLoss / 100;
+                  const isProfit = profit >= 0;
+                  
+                  return (
+                    <div key={result.id} className="bg-slate-700 rounded-lg p-6 border border-slate-600">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="text-lg font-semibold text-white">{result.gameHistory.tableName}</h3>
+                          <p className="text-sm text-slate-400">
+                            {new Date(result.gameHistory.endedAt).toLocaleDateString()} at {new Date(result.gameHistory.endedAt).toLocaleTimeString()}
+                          </p>
+                        </div>
+                        <div className={`text-3xl font-bold ${isProfit ? 'text-green-400' : 'text-red-400'}`}>
+                          {isProfit ? '+' : ''}{profit.toFixed(2)}
+                        </div>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div>
+                          <p className="text-slate-400">Buy-in Total</p>
+                          <p className="text-white font-semibold">${(result.buyInTotal / 100).toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="text-slate-400">End Stack</p>
+                          <p className="text-white font-semibold">${(result.cashOutAmount / 100).toFixed(2)}</p>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-4 pt-4 border-t border-slate-600">
+                        <p className="text-xs text-slate-400">
+                          Chips: {result.chipCountWhite}W {result.chipCountBlue}B {result.chipCountRed}R {result.chipCountGreen}G {result.chipCountBlack}Blk
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>

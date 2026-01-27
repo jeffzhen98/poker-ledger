@@ -12,8 +12,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     const { playerId, amount } = Body.parse(await req.json());
     
+    // Check if id is a join code or database ID
+    const isJoinCode = /^[A-Z]{4}$/.test(id);
+    
+    // Get the actual table ID if using join code
+    let tableId = id;
+    if (isJoinCode) {
+      const table = await prisma.table.findUnique({
+        where: { joinCode: id },
+        select: { id: true }
+      });
+      if (!table) {
+        return NextResponse.json({ error: "Table not found" }, { status: 404 });
+      }
+      tableId = table.id;
+    }
+    
     const entry = await prisma.buyIn.create({ 
-      data: { tableId: id, playerId, amount } 
+      data: { tableId, playerId, amount } 
     });
     
     return NextResponse.json(entry);

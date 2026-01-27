@@ -160,9 +160,17 @@ export default function TablePage() {
 
   const addPlayer = async () => {
     if (!playerName) return;
+    
+    const payload: any = { name: playerName };
+    
+    // Check if the entered name matches the current user's display name
+    if (user && playerName === displayName) {
+      payload.userId = user.id;
+    }
+    
     await fetch(`/api/table/${id}/players`, {
       method: "POST",
-      body: JSON.stringify({ name: playerName }),
+      body: JSON.stringify(payload),
     });
     setPlayerName("");
     mutate();
@@ -305,12 +313,22 @@ export default function TablePage() {
 
             <div className="flex gap-2">
               <input
-                className="border border-slate-600 rounded px-3 py-2 bg-slate-700 text-white placeholder:text-slate-400"
-                placeholder="Player name"
+                className="flex-1 border border-slate-600 rounded px-3 py-2 bg-slate-700 text-white placeholder:text-slate-400"
+                placeholder="Enter player name"
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
+                list="available-users"
               />
-              <button onClick={addPlayer} className="px-4 py-2 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition">
+              <datalist id="available-users">
+                {user && displayName && (
+                  <option value={displayName}>{displayName} (You)</option>
+                )}
+              </datalist>
+              <button 
+                onClick={addPlayer} 
+                disabled={!playerName}
+                className="px-4 py-2 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
                 Add
               </button>
             </div>
@@ -434,14 +452,13 @@ export default function TablePage() {
                           <input
                             type="number"
                             min={0}
-                            value={chips[color]}
+                            value={chips[color] || ""}
+                            placeholder="0"
                             onChange={(e) => {
                               const value = e.target.value === '' ? 0 : Number(e.target.value);
                               updatePlayerChip(p.id, color, value);
                             }}
                             onBlur={() => savePlayerChips(p.id)}
-                            onClick={(e) => e.currentTarget.select()}
-                            onFocus={(e) => e.currentTarget.select()}
                             className="border border-gray-300 dark:border-neutral-600 rounded px-2 py-1 w-20 bg-white dark:bg-neutral-700 text-gray-900 dark:text-white"
                           />
                           </td>
@@ -478,6 +495,53 @@ export default function TablePage() {
               </button>
             </div>
           </section>
+
+          {/* End Game - Only visible to host */}
+          {user && data.hostId === user.id && (
+            <section className="bg-red-900 bg-opacity-20 rounded-2xl shadow-2xl p-6 border border-red-700 mt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-white">End Game</h3>
+                  <p className="text-sm text-slate-400 mt-1">
+                    Archive this game and save results to player history
+                  </p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={async () => {
+                    if (!confirm('Are you sure you want to end this game? This will archive all results and delete the active table.')) return;
+                    
+                    try {
+                      const { data: { session } } = await supabase.auth.getSession();
+                      const token = session?.access_token;
+                      
+                      const res = await fetch(`/api/table/${id}/archive`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          ...(token && { 'Authorization': `Bearer ${token}` })
+                        }
+                      });
+                      
+                      if (res.ok) {
+                        alert('Game ended and archived successfully!');
+                        window.location.href = '/';
+                      } else {
+                        const error = await res.json();
+                        alert(error.error || 'Failed to end game');
+                      }
+                    } catch (error) {
+                      console.error('Error ending game:', error);
+                      alert('Failed to end game');
+                    }
+                  }}
+                  className="px-6 py-3 rounded-2xl bg-red-600 hover:bg-red-700 text-white transition font-semibold"
+                >
+                  End Game
+                </button>
+              </div>
+            </section>
+          )}
         </>
       )}
         </div>
