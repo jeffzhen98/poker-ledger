@@ -11,6 +11,7 @@ export default function Home() {
   const [showEditName, setShowEditName] = useState(false);
   const [editNameLoading, setEditNameLoading] = useState(false);
   const [gameHistory, setGameHistory] = useState<any[]>([]);
+  const [joinCode, setJoinCode] = useState("");
 
   useEffect(() => {
     // Create a deep history stack to prevent going back
@@ -117,6 +118,12 @@ export default function Home() {
     }
   };
 
+  const joinTable = () => {
+    if (joinCode.length === 4) {
+      window.location.href = `/table/${joinCode.toUpperCase()}`;
+    }
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     window.location.href = "/auth";
@@ -215,6 +222,35 @@ export default function Home() {
             </div>
             <p className="text-sm text-slate-400 mt-4">
               💡 Share the game link with other players to join the same table
+            </p>
+          </div>
+
+          {/* Join Table Card */}
+          <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-xl shadow-2xl p-8 border border-slate-700 mb-10">
+            <h2 className="text-xl font-semibold text-white mb-6">Join Existing Game</h2>
+            <div className="flex gap-3">
+              <input 
+                className="flex-1 px-4 py-3 rounded-lg bg-slate-700 border border-slate-600 text-white placeholder:text-slate-400 focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500 transition uppercase" 
+                placeholder="Enter 4-letter code (e.g., ABCD)" 
+                value={joinCode} 
+                onChange={e=>setJoinCode(e.target.value.toUpperCase())} 
+                maxLength={4}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && joinCode.length === 4) {
+                    joinTable();
+                  }
+                }}
+              />
+              <button 
+                onClick={joinTable} 
+                disabled={joinCode.length !== 4} 
+                className="px-6 py-3 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                Join
+              </button>
+            </div>
+            <p className="text-sm text-slate-400 mt-4">
+              🎲 Enter the code from the table host to join their game
             </p>
           </div>
 
