@@ -19,8 +19,18 @@ export default function TablePage() {
   const params = useParams<{ id: string }>();
   const id = params?.id as string;
 
-  const { data, mutate } = useSWR(id ? `/api/table/${id}` : null, fetcher, {
+  const { data, mutate, error } = useSWR(id ? `/api/table/${id}` : null, fetcher, {
     refreshInterval: 2500,
+    onError: (err) => {
+      console.error("Error fetching table:", err);
+    },
+    onSuccess: (data) => {
+      // If table has been deleted (null response), redirect to home
+      if (data === null) {
+        alert("This game has ended and been archived.");
+        window.location.href = "/";
+      }
+    }
   });
 
   const [playerName, setPlayerName] = useState("");

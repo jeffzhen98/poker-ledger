@@ -63,9 +63,13 @@ export default function Home() {
         if (historyRes.ok) {
           const history = await historyRes.json();
           setGameHistory(history);
+        } else {
+          console.error("Failed to fetch game history:", await historyRes.text());
+          setGameHistory([]); // Set to empty array on error
         }
       } catch (error) {
         console.error("Error fetching game history:", error);
+        setGameHistory([]); // Set to empty array on error
       }
     };
 
