@@ -72,11 +72,28 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to generate unique join code" }, { status: 500 });
   }
 
+  // Get or create user in database
+  const dbUser = await prisma.user.upsert({
+    where: { email: user.email! },
+    update: {},
+    create: {
+      id: user.id,
+      email: user.email!,
+      displayName: user.user_metadata?.displayName || user.email!.split('@')[0]
+    }
+  });
+
   const table = await prisma.table.create({ 
     data: { 
       name,
       joinCode,
-      hostId: user.id
+      hostId: user.id,
+      players: {
+        create: {
+          name: dbUser.displayName,
+          userId: user.id
+        }
+      }
     } 
   });
   

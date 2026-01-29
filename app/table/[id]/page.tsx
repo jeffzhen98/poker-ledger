@@ -33,7 +33,6 @@ export default function TablePage() {
     }
   });
 
-  const [playerName, setPlayerName] = useState("");
   const [rebuyAmt, setRebuyAmt] = useState("");
   const [rebuyPlayer, setRebuyPlayer] = useState("");
   const [user, setUser] = useState<any>(null);
@@ -83,6 +82,30 @@ export default function TablePage() {
     };
     getUser();
   }, []);
+
+  // Auto-add current user as player if not already added
+  useEffect(() => {
+    const autoJoinTable = async () => {
+      if (!user || !data?.players || !displayName) return;
+      
+      // Check if user is already a player
+      const isAlreadyPlayer = data.players.some((p: any) => p.userId === user.id);
+      
+      if (!isAlreadyPlayer) {
+        // Add current user as player
+        await fetch(`/api/table/${id}/players`, {
+          method: "POST",
+          body: JSON.stringify({ 
+            name: displayName,
+            userId: user.id 
+          }),
+        });
+        mutate();
+      }
+    };
+    
+    autoJoinTable();
+  }, [user, data, displayName, id, mutate]);
 
   const handleEditName = async () => {
     if (!displayName.trim()) return;
@@ -166,24 +189,6 @@ export default function TablePage() {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     await submitDenoms(fd);
-  };
-
-  const addPlayer = async () => {
-    if (!playerName) return;
-    
-    const payload: any = { name: playerName };
-    
-    // Check if the entered name matches the current user's display name
-    if (user && playerName === displayName) {
-      payload.userId = user.id;
-    }
-    
-    await fetch(`/api/table/${id}/players`, {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    setPlayerName("");
-    mutate();
   };
 
   const addBuyIn = async () => {
@@ -320,28 +325,9 @@ export default function TablePage() {
                 Total Buy-ins: <strong className="text-white">${totalBuyInsDollars}</strong>
               </div>
             </div>
-
-            <div className="flex gap-2">
-              <input
-                className="flex-1 border border-slate-600 rounded px-3 py-2 bg-slate-700 text-white placeholder:text-slate-400"
-                placeholder="Enter player name"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                list="available-users"
-              />
-              <datalist id="available-users">
-                {user && displayName && (
-                  <option value={displayName}>{displayName} (You)</option>
-                )}
-              </datalist>
-              <button 
-                onClick={addPlayer} 
-                disabled={!playerName}
-                className="px-4 py-2 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Add
-              </button>
-            </div>
+            <p className="text-sm text-slate-400">
+              Players are automatically added when they join the table. Share the join code <strong className="text-white">{data.joinCode}</strong> with others.
+            </p>
 
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
