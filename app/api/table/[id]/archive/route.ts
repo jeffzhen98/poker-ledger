@@ -78,6 +78,11 @@ export async function POST(
   }
 
   try {
+    // Get all users to match player names to userIds
+    const allUsers = await prisma.user.findMany({
+      select: { id: true, displayName: true, email: true }
+    });
+
     // Create game history
     const gameHistory = await prisma.gameHistory.create({
     data: {
@@ -118,8 +123,18 @@ export async function POST(
               100
           ); // Convert to cents
 
+          // Try to match player to a user account by display name if userId is not set
+          let userId = player.userId;
+          if (!userId && player.name) {
+            const matchedUser = allUsers.find(u => 
+              u.displayName?.toLowerCase() === player.name.toLowerCase() ||
+              u.email?.split('@')[0].toLowerCase() === player.name.toLowerCase()
+            );
+            userId = matchedUser?.id || null;
+          }
+
           return {
-            userId: player.userId,
+            userId,
             playerName: player.name,
             buyInTotal,
             chipCountWhite: finalChipCount.white,
